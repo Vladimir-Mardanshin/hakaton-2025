@@ -113,3 +113,33 @@ def get_data(
         result = cursor.fetchall()
     conn.close()
     return result
+
+# Добавление остановки
+@app.post("/stops/add")
+def add_stop(name: str = Query(...), latitude: float = Query(...), longitude: float = Query(...)):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+                INSERT INTO stops (name, latitude, longitude)
+                VALUES (%s, %s, %s)
+            """
+            cursor.execute(sql, (name, latitude, longitude))
+            conn.commit()
+        return {"message": "Stop added successfully"}
+    except Exception as e:
+        conn.rollback()
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+# Получение всех остановок
+@app.get("/stops")
+def get_stops():
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM stops")
+        result = cursor.fetchall()
+    conn.close()
+    return result

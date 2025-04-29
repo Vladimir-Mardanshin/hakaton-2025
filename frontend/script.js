@@ -1,17 +1,16 @@
 const apiBaseUrl = 'http://127.0.0.1:8000';
 
-let map = L.map('map').setView([52.286974, 104.305018], 12); // Иркутск
-let transportData = []; // Все точки
-let marker = null; // маркер для поиска ближайшей точки
-let busMarker = null; // маркер автобуса
-let timeSlider = null; // слайдер времени
-let animationInterval = null; // интервал анимации
-const animationSpeed = 60; // на сколько секунд двигаем границы (например, 1 минута)
-const animationDelay = 300; // каждые 300 миллисекунд
+let map = L.map('map').setView([52.286974, 104.305018], 12);
+let transportData = []; 
+let marker = null;
+let busMarker = null; 
+let timeSlider = null; 
+let animationInterval = null; 
+const animationSpeed = 60; 
+const animationDelay = 300; 
 
-// Иконка автобуса
 const busIcon = L.icon({
-    iconUrl: 'bus.png', // Локальный файл
+    iconUrl: 'bus.png', 
     iconSize: [32, 32],
     iconAnchor: [16, 16]
 });
@@ -143,26 +142,65 @@ function updatePolylineFromSlider() {
     });
 
     const filteredPoints = transportData.filter(row => row[2] >= startTime && row[2] <= endTime);
-    const filteredCoordinates = filteredPoints.map(row => [row[5], row[6]]);
 
-    if (filteredCoordinates.length > 0) {
-        const polyline = L.polyline(filteredCoordinates, { color: 'red' }).addTo(map);
-        const lastPoint = filteredCoordinates[filteredCoordinates.length - 1];
-
-        if (busMarker) {
-            busMarker.setLatLng(lastPoint);
-        } else {
-            busMarker = L.marker(lastPoint, { icon: busIcon }).addTo(map);
-        }
-
-        map.fitBounds(polyline.getBounds());
-    } else {
+    if (filteredPoints.length < 2) {
         if (busMarker) {
             map.removeLayer(busMarker);
             busMarker = null;
         }
+        return;
     }
+
+    const speeds = filteredPoints.map(row => row[7]);
+    const minSpeed = Math.min(...speeds);
+    const maxSpeed = Math.max(...speeds);
+
+    function getColor(speed) {
+        if (speed <= 1) return 'rgb(255,0,0)'; 
+        if (speed >= 11) return 'rgb(0,255,0)';
+    
+        if (speed <= 5) {
+            const ratio = (speed - 1) / (5 - 1);
+            return `rgb(255,${Math.round(165 * ratio)},0)`; 
+        }
+    
+        if (speed <= 10) {
+            const ratio = (speed - 5) / (10 - 5);
+            return `rgb(255,${Math.round(165 + (90 * ratio))},0)`;
+        }
+    
+        const ratio = (speed - 10) / (15 - 10);
+        const r = Math.round(255 - (255 * ratio));
+        return `rgb(${r},255,0)`;
+    }
+    
+
+    for (let i = 0; i < filteredPoints.length - 1; i++) {
+        const p1 = filteredPoints[i];
+        const p2 = filteredPoints[i + 1];
+
+        const latlngs = [
+            [p1[5], p1[6]],
+            [p2[5], p2[6]]
+        ];
+
+        const speed = p1[7]; 
+        const color = getColor(speed);
+
+        L.polyline(latlngs, { color: color, weight: 5 }).addTo(map);
+    }
+
+    const lastPoint = filteredPoints[filteredPoints.length - 1];
+
+    if (busMarker) {
+        busMarker.setLatLng([lastPoint[5], lastPoint[6]]);
+    } else {
+        busMarker = L.marker([lastPoint[5], lastPoint[6]], { icon: busIcon }).addTo(map);
+    }
+
+    map.fitBounds(L.polyline(filteredPoints.map(row => [row[5], row[6]])).getBounds());
 }
+
 
 function findNearestPoint() {
     const timeInput = document.getElementById('timeSelect').value;
