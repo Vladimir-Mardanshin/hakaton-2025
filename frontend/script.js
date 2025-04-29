@@ -10,10 +10,11 @@ const animationSpeed = 60;
 const animationDelay = 300; 
 
 const busIcon = L.icon({
-    iconUrl: 'bus.png', 
+    iconUrl: 'bus.png',
     iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    iconAnchor: [16, 32] // центр по горизонтали, низ по вертикали
 });
+
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
@@ -36,6 +37,14 @@ async function fetchOptions(endpoint, selectId) {
 fetchOptions('/cities', 'citySelect');
 fetchOptions('/routes', 'routeSelect');
 fetchOptions('/vehicle_types', 'vehicleTypeSelect');
+
+function exportGTFS() {
+    const link = document.createElement('a');
+    link.href = `${apiBaseUrl}/stops/gtfs`;
+    link.download = 'stops.txt';
+    link.click();
+}
+
 
 async function findTransports() {
     const vehicleType = document.getElementById('vehicleTypeSelect').value;
@@ -105,6 +114,9 @@ async function loadData() {
     if (transportData.length > 0) {
         createTimeSlider();
     }
+
+    await showStops();
+
 }
 
 function createTimeSlider() {
@@ -252,6 +264,31 @@ function findNearestPoint() {
         alert('Нет данных для выбранного времени');
     }
 }
+
+let stopMarkers = [];
+
+async function showStops() {
+    const response = await fetch(`${apiBaseUrl}/stops`);
+    const data = await response.json();
+
+    // Удалим старые маркеры, если есть
+    stopMarkers.forEach(marker => map.removeLayer(marker));
+    stopMarkers = [];
+
+    data.forEach(stop => {
+        const [id, name, lat, lon] = stop;
+        const marker = L.circleMarker([lat, lon], {
+            radius: 6,
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.8
+        }).addTo(map);
+
+        marker.bindPopup(`<b>Остановка:</b> ${name}`);
+        stopMarkers.push(marker);
+    });
+}
+
 
 function startAnimation() {
     if (animationInterval) return;

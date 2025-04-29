@@ -2,6 +2,9 @@ from fastapi import FastAPI, Query
 import pymysql
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import io
+import csv
 
 app = FastAPI()
 
@@ -14,7 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # Настройки подключения к БД
 db_config = {
     'host': 'localhost',
@@ -25,6 +27,29 @@ db_config = {
 
 def get_connection():
     return pymysql.connect(**db_config)
+
+
+@app.get("/stops/gtfs")
+def export_gtfs_stops():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id, name, latitude, longitude FROM stops")
+            stops = cursor.fetchall()
+
+        # Создание CSV в памяти
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["stop_id", "stop_name", "stop_lat", "stop_lon"])
+        for stop in stops:
+            writer.writerow(stop)
+
+        output.seek(0)
+        return StreamingResponse(output, media_type="text/csv", headers={
+            "Content-Disposition": "attachment; filename=stops.txt"
+        })
+    finally:
+        conn.close()
 
 
 # Маршрут получения всех городов
@@ -113,6 +138,7 @@ def get_data(
         result = cursor.fetchall()
     conn.close()
     return result
+
 
 # Добавление остановки
 @app.post("/stops/add")
